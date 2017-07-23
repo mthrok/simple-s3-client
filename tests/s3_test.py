@@ -8,14 +8,20 @@ from moto import mock_s3
 
 from simple_s3_client import utils, s3 as s3_
 
-_TEST_BUCKET = 'test-bucket'
+_BUCKET = 'test-bucket'
+_REGION = 'us-east-1'
+_PREFIX = 'test'
 
 
-def _init_bucket_and_clients(bucket, region='us-east-1'):
+def _init_bucket_and_clients(bucket=_BUCKET, region=_REGION, prefix=_PREFIX):
     client = boto3.client('s3', region_name=region)
     client.create_bucket(Bucket=bucket)
-    s3 = s3_.S3(bucket=bucket, region=region)
+    s3 = s3_.S3(bucket=bucket, region=region, prefix=prefix)
     return client, s3
+
+
+def _prefix(key, prefix=_PREFIX):
+    return '{}/{}'.format(prefix, key) if prefix else key
 
 
 class TestS3(unittest.TestCase):
@@ -23,21 +29,21 @@ class TestS3(unittest.TestCase):
     @mock_s3
     def test_file_exists(self):
         """file_exists returns True when file exists otherwise False"""
-        key = 'test/random_file'
-        client, s3 = _init_bucket_and_clients(bucket=_TEST_BUCKET)
+        client, s3 = _init_bucket_and_clients()
 
+        key = 'random_file'
         self.assertFalse(s3.file_exists(key))
-        client.put_object(Bucket=_TEST_BUCKET, Key=key, Body='foo')
+        client.put_object(Bucket=_BUCKET, Key=_prefix(key), Body='foo')
         self.assertTrue(s3.file_exists(key))
 
     @mock_s3
     def test_files_exist(self):
         """files_exist returns True for existing files and False for not"""
-        keys = ['test/{}.json.gz'.format(i) for i in range(30)]
-        client, s3 = _init_bucket_and_clients(bucket=_TEST_BUCKET)
+        client, s3 = _init_bucket_and_clients()
 
+        keys = ['{}.json.gz'.format(i) for i in range(30)]
         for key in keys[::3]:
-            client.put_object(Bucket=_TEST_BUCKET, Key=key, Body='foo')
+            client.put_object(Bucket=_BUCKET, Key=_prefix(key), Body='foo')
 
         flags = s3.files_exist(keys=keys)
         for i, flag in enumerate(flags):
@@ -46,52 +52,50 @@ class TestS3(unittest.TestCase):
     @mock_s3
     def test_put_obj(self):
         """put_obj stores string object on S3"""
-        key, obj = 'random_file', 'foo'
-        client, s3 = _init_bucket_and_clients(bucket=_TEST_BUCKET)
+        client, s3 = _init_bucket_and_clients()
 
+        key, obj = 'random_file', 'foo'
         s3.put_obj(key, obj, compress=False)
-        found = client.get_object(
-            Bucket=_TEST_BUCKET, Key=key)['Body'].read().decode('utf8')
+        resp = client.get_object(Bucket=_BUCKET, Key=_prefix(key))
+        found = resp['Body'].read().decode('utf8')
         self.assertEqual(obj, found)
 
     def _test_put_jsonl(self, obj):
         """Put the given object on S3 and check if it's same"""
-        keys = ['file.jsonl', 'file.jsonl.gz']
-        client, s3 = _init_bucket_and_clients(bucket=_TEST_BUCKET)
+        client, s3 = _init_bucket_and_clients()
 
-        obj = [obj] if not isinstance(obj, list) else obj
+        keys = ['file.jsonl', 'file.jsonl.gz']
         dumped = utils.dump_jsonl(obj).encode('utf-8')
 
         s3.put_jsonl(keys[0], obj, compress=False)
         expected = dumped
-        found = client.get_object(
-            Bucket=_TEST_BUCKET, Key=keys[0])['Body'].read()
+        resp = client.get_object(Bucket=_BUCKET, Key=_prefix(keys[0]))
+        found = resp['Body'].read()
         self.assertEqual(expected, found)
 
         s3.put_jsonl(keys[1], obj, compress=True)
         expected = utils.compress_bytes(dumped)
-        found = client.get_object(
-            Bucket=_TEST_BUCKET, Key=keys[1])['Body'].read()
+        resp = client.get_object(Bucket=_BUCKET, Key=_prefix(keys[1]))
+        found = resp['Body'].read()
         self.assertEqual(expected, found)
 
     def _test_put_json(self, obj):
         """Put the given object on S3 and check if it's same"""
+        client, s3 = _init_bucket_and_clients()
+
         keys = ['file.json', 'file.json.gz']
-
-        client, s3 = _init_bucket_and_clients(bucket=_TEST_BUCKET)
-
         dumped = json.dumps(obj).encode('utf-8')
 
         s3.put_json(keys[0], obj, compress=False)
         expected = dumped
-        found = client.get_object(
-            Bucket=_TEST_BUCKET, Key=keys[0])['Body'].read()
+        resp = client.get_object(Bucket=_BUCKET, Key=_prefix(keys[0]))
+        found = resp['Body'].read()
         self.assertEqual(expected, found)
 
         s3.put_json(keys[1], obj, compress=True)
         expected = utils.compress_bytes(dumped)
-        found = client.get_object(
-            Bucket=_TEST_BUCKET, Key=keys[1])['Body'].read()
+        resp = client.get_object(Bucket=_BUCKET, Key=_prefix(keys[1]))
+        found = resp['Body'].read()
         self.assertEqual(expected, found)
 
     @mock_s3

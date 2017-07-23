@@ -24,9 +24,13 @@ class S3(object):
         Base prefix to store object. When valid string is given,
         all the keys given to methods are prefixed with this.
     """
-    def __init__(self, bucket, region='us-east-1'):
+    def __init__(self, bucket, region='us-east-1', prefix=None):
         self.bucket = bucket
+        self.prefix = prefix
         self._client = boto3.client('s3', region_name=region)
+
+    def _prefix(self, key):
+        return '{}/{}'.format(self.prefix, key) if self.prefix else key
 
     def file_exists(self, key):
         """Check if a file with the given key exists"""
@@ -54,6 +58,8 @@ class S3(object):
         [True, True, False]
         """
         prefix = os.path.commonprefix(keys)
+        prefix = self._prefix(prefix) if prefix else self.prefix
+        keys = [self._prefix(key) for key in keys]
         ret = [False] * len(keys)
 
         paginator = self._client.get_paginator('list_objects')
@@ -65,7 +71,8 @@ class S3(object):
 
     def get_url(self, key):
         """Get the URL for public access"""
-        return 'https://s3.amazonaws.com/{}/{}'.format(self.bucket, key)
+        return 'https://s3.amazonaws.com/{}/{}'.format(
+            self.bucket, self._prefix(key))
 
     def put_obj(self, key, obj, compress=True, acl='private'):
         """Put a byte string object on S3
@@ -89,6 +96,7 @@ class S3(object):
             'authenticated-read', 'aws-exec-read', 'bucket-owner-read' or
             'bucket-owner-full-control'.
         """
+        key = self._prefix(key)
         obj = utils.compress(obj) if compress else obj
         _LG.info('Storing data on s3://%s/%s', self.bucket, key)
         self._client.put_object(Bucket=self.bucket, Key=key, Body=obj, ACL=acl)
@@ -111,6 +119,7 @@ class S3(object):
         byte strings
             Byte string represents the object
         """
+        key = self._prefix(key)
         _LG.info('Fetching s3://%s/%s', self.bucket, key)
         resp = self._client.get_object(Bucket=self.bucket, Key=key)
         data = resp['Body'].read()
