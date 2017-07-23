@@ -1,0 +1,22 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: themattrix/tox
+
+    working_directory: ~/repo
+    steps:
+      - checkout
+
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "./requirements_test.txt" }}
+
+      - run:
+          name: Run Test
+          command: tox
+
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "./requirements_test.txt" }}
+          paths:
+            - ".tox"
+
