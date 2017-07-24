@@ -20,3 +20,11 @@ jobs:
           paths:
             - ".tox"
 
+      - run:
+          name: Report Coverage to Codacy
+          command: |
+            if [[ -n "${CODACY_PROJECT_TOKEN}" ]]; then
+              apt-get update && apt-get install -y git
+              pip3 install codacy-coverage
+              python-codacy-coverage -r coverage.xml
+            fi
