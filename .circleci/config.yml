@@ -23,8 +23,8 @@ jobs:
       - run:
           name: Report Coverage to Codacy
           command: |
-            if [[ -n "${CODACY_PROJECT_TOKEN}" ]]; then
+            if [[ -n "${COVERALLS_REPO_TOKEN}" ]]; then
               apt-get update && apt-get install -y git
-              pip3 install codacy-coverage
-              python-codacy-coverage -r coverage.xml
+              pip3 install coveralls
+              coveralls
             fi
