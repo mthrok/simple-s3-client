@@ -5,7 +5,7 @@ import setuptools
 def _setup():
     setuptools.setup(
         name='simple-s3-client',
-        version='v0.0.1',
+        version='v0.1.0',
         packages=setuptools.find_packages(
             exclude=[
                 'tests',
